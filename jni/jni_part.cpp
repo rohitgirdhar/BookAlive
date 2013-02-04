@@ -5,7 +5,9 @@
 #include "opencv2/highgui/highgui.hpp"
 #include "opencv2/calib3d/calib3d.hpp"
 #include <vector>
+#include <android/log.h>
 
+#define APPNAME "BookAlive"
 using namespace cv;
 using namespace std;
 
@@ -30,7 +32,7 @@ Mat findHomography(Mat orig, Mat test) {
         if(dist < min_dist) min_dist = dist;
         if(dist > max_dist) max_dist = dist;
     }
-    double acceptable_dist = 3*min_dist;
+    double acceptable_dist = 2*min_dist;
     vector<DMatch> good_matches;
     for(size_t i=0; i<desc_orig.rows; i++) {
         if(matches[i].distance < acceptable_dist) {
@@ -51,6 +53,7 @@ Mat findHomography(Mat orig, Mat test) {
 
 JNIEXPORT void JNICALL Java_org_opencv_samples_BookAlive_FindFeatures(JNIEnv*, jobject, jlong addrGray, jlong addrRgba);
 JNIEXPORT void JNICALL Java_org_opencv_samples_BookAlive_Sample4Mixed_Draw(JNIEnv*, jobject, jlong addrGray, jlong addrRgba);
+    JNIEXPORT void JNICALL Java_org_opencv_samples_BookAlive_Sample4Mixed_mapPoints(JNIEnv*, jobject, jlong, jlong, jlong);
 
 JNIEXPORT void JNICALL Java_org_opencv_samples_BookAlive_FindFeatures(JNIEnv*, jobject, jlong addrGray, jlong addrRgba)
 {
@@ -78,5 +81,31 @@ JNIEXPORT void JNICALL Java_org_opencv_samples_BookAlive_Sample4Mixed_Draw(JNIEn
     n.push_back(Point2f(10,1000));
     perspectiveTransform(n, n2, H);
     line(test, n2[0], n2[1], Scalar(0,255,0), 10);
+}
+
+JNIEXPORT void JNICALL Java_org_opencv_samples_BookAlive_Sample4Mixed_mapPoints(JNIEnv*, jobject, jlong addrOrig, jlong addrTest, jlong addrPts)
+{
+    
+    Mat& orig  = *(Mat*)addrOrig;
+    Mat& test = *(Mat*)addrTest;
+    Mat& pts =  *(Mat*)addrPts;
+
+
+
+    Mat H = findHomography(orig,test);
+   
+    
+    vector< Point2f > n,n2;
+    for(size_t i=0; i<pts.rows; i++) {
+	n.push_back(Point2f(pts.at<double>(i,0),pts.at<double>(i,1)));
+    }
+
+    perspectiveTransform(n, n2, H);
+    //__android_log_print(ANDROID_LOG_VERBOSE, APPNAME, "The size of pts is %lf %lf", pts.at<double>(0,0), pts.at<double>(0,1));    
+    for(size_t i=0; i<n2.size(); i++) {
+        pts.at<double>(i,0) = n2[i].x;
+        pts.at<double>(i,1) = n2[i].y;
+    }
+    
 }
 }

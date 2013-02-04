@@ -8,12 +8,16 @@ import org.opencv.android.CameraBridgeViewBase.CvCameraViewListener;
 import org.opencv.android.LoaderCallbackInterface;
 import org.opencv.android.OpenCVLoader;
 import org.opencv.android.Utils;
+import org.opencv.core.Core;
 import org.opencv.core.CvType;
 import org.opencv.core.Mat;
+import org.opencv.core.Point;
+import org.opencv.core.Scalar;
 import org.opencv.highgui.Highgui;
 import org.opencv.imgproc.Imgproc;
 
 import android.app.Activity;
+import android.content.Intent;
 import android.graphics.Bitmap;
 import android.os.Bundle;
 import android.os.Environment;
@@ -25,11 +29,13 @@ import android.widget.ImageView;
 
 public class Sample4Mixed extends Activity implements CvCameraViewListener {
     private static final String    TAG = "OCVSample::Activity";
-
+    
+    private static final int       CAPTURE_IMAGE	     = 1;
     private static final int       VIEW_MODE_RGBA     = 0;
     private static final int       VIEW_MODE_GRAY     = 1;
     private static final int       VIEW_MODE_CANNY    = 2;
     private static final int       VIEW_MODE_FEATURES = 5;
+
 
     private int                    mViewMode;
     private Mat                    mRgba;
@@ -40,6 +46,7 @@ public class Sample4Mixed extends Activity implements CvCameraViewListener {
     private MenuItem               mItemPreviewGray;
     private MenuItem               mItemPreviewCanny;
     private MenuItem               mItemPreviewFeatures;
+    ImageView imageView;
 
     private CameraBridgeViewBase   mOpenCvCameraView;
 
@@ -76,36 +83,55 @@ public class Sample4Mixed extends Activity implements CvCameraViewListener {
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
 
         setContentView(R.layout.tutorial4_surface_view);
-        
+       
 
         if (!OpenCVLoader.initDebug()) {
         	// Handle initialization error
         	Log.e("Here", "Here error");
         }
-
+        imageView = (ImageView) findViewById(R.id.imageView1);
         //mOpenCvCameraView = (CameraBridgeViewBase) findViewById(R.id.tutorial4_activity_surface_view);
         //mOpenCvCameraView.setCvCameraViewListener(this);
-        System.loadLibrary("mixed_sample");
+        
 
-
+        //Intent intent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
+        //startActivityForResult(intent, CAPTURE_IMAGE);
+        
+        // TEMP FOR NOW
         String SD_CARD_PATH = Environment.getExternalStorageDirectory().toString();
-        File f1 = new File(SD_CARD_PATH + "/" + "act.jpg");
-        File f2 = new File(SD_CARD_PATH + "/" + "test.jpg");
-        Mat orig = Highgui.imread(f1.getAbsolutePath());
-        Imgproc.cvtColor(orig, orig, Imgproc.COLOR_RGBA2GRAY);
-        Mat test = Highgui.imread(f2.getAbsolutePath());
-        Imgproc.cvtColor(test, test, Imgproc.COLOR_RGBA2GRAY);
-        //Imgproc.cvtColor(orig, orig, Imgproc.COLOR_GRAY2BGRA, 4);
-        //Imgproc.cvtColor(test, test, Imgproc.COLOR_GRAY2BGRA, 4);
-
-        Draw(orig.getNativeObjAddr(),test.getNativeObjAddr());
-        ImageView imageView = (ImageView) findViewById(R.id.imageView1); 
-        Bitmap bmp = Bitmap.createBitmap(test.cols(), test.rows(), Bitmap.Config.ARGB_8888);
-        Utils.matToBitmap(test, bmp);
-        imageView.setImageBitmap(bmp);
+        File f1 = new File(SD_CARD_PATH + "/" + "test3.jpg");
+        Mat test = Highgui.imread(f1.getAbsolutePath());
+        process(test);
+        
     }
     
-
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+    	if(requestCode == CAPTURE_IMAGE) {
+    		if(resultCode == RESULT_OK) {
+    			Mat test = new Mat();
+    			Bitmap photo = (Bitmap) data.getExtras().get("data");
+    			Utils.bitmapToMat(photo, test);
+    			process(test);
+    		}
+    	}
+    }
+    
+    protected void saveImg(Mat img, String fname) {
+    	String SD_CARD_PATH = Environment.getExternalStorageDirectory().toString();
+    	String uri = SD_CARD_PATH + "/" + fname;
+    	Highgui.imwrite(uri, img);
+    }
+    
+    
+    protected Mat imageRetrieve(Mat test) {
+    	// TODO
+    	String SD_CARD_PATH = Environment.getExternalStorageDirectory().toString();
+        File f1 = new File(SD_CARD_PATH + "/" + "act.jpg");
+        Mat orig = Highgui.imread(f1.getAbsolutePath());
+        return orig;
+    }
+    
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
         Log.i(TAG, "called onCreateOptionsMenu");
@@ -132,6 +158,8 @@ public class Sample4Mixed extends Activity implements CvCameraViewListener {
         
         
     }
+    
+    
 
     public void onDestroy() {
         super.onDestroy();
@@ -198,7 +226,40 @@ public class Sample4Mixed extends Activity implements CvCameraViewListener {
 
         return true;
     }
+    
+    public void process(Mat test) {
+    	Mat orig = imageRetrieve(test);
+		saveImg(test, "res.jpg");
+		Imgproc.cvtColor(orig, orig, Imgproc.COLOR_RGBA2GRAY);
+        Imgproc.cvtColor(test, test, Imgproc.COLOR_RGBA2GRAY);
+        double[] arr = new double[1];
+        arr[0] = 10;
+        Mat p = new Mat(2, 2, CvType.CV_64FC1);	
+        p.put(0, 0, arr);
+        arr[0] = 100;
+        p.put(0, 1, arr);
+        arr[0] = 10;
+        p.put(0, 0, arr);
+        arr[0] = 1000;
+        p.put(0, 1, arr);
+        
+        mapPoints(orig.getNativeObjAddr(), test.getNativeObjAddr(), p.getNativeObjAddr());
+        String res = Double.toString(p.get(0,0)[0]) + " " + Double.toString(p.get(0,1)[0]) + " ";
+        res += Double.toString(p.get(1,0)[0]) + " " + Double.toString(p.get(1,1)[0]);
+        Log.v("TAG", res);
+        Core.line(test, new Point(p.get(0,0)[0], p.get(0,1)[0]), new Point(p.get(1,0)[0], p.get(1,1)[0]), new Scalar(0,255,0), 10);
+        Bitmap bmp = Bitmap.createBitmap(test.cols(), test.rows(), Bitmap.Config.ARGB_8888);
+        Utils.matToBitmap(test, bmp);
+        imageView.setImageBitmap(bmp);
+        
+    }
 
-    public native void FindFeatures(long matAddrGr, long matAddrRgba);
+    
+	public native void FindFeatures(long matAddrGr, long matAddrRgba);
     public native void Draw(long matOrig, long matTest);
+    public native void mapPoints(long addrOrig, long addrTest, long addrP);
+    static {
+    	 System.loadLibrary("opencv_java"); //load opencv_java lib	
+         System.loadLibrary("mixed_sample");
+    }
 }
