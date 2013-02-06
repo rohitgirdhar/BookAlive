@@ -1,6 +1,14 @@
 package org.opencv.samples.BookAlive;
 
+import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.nio.charset.Charset;
+import java.util.ArrayList;
+import java.util.List;
 
 import org.opencv.android.BaseLoaderCallback;
 import org.opencv.android.CameraBridgeViewBase;
@@ -19,13 +27,18 @@ import org.opencv.imgproc.Imgproc;
 import android.app.Activity;
 import android.content.Intent;
 import android.graphics.Bitmap;
+import android.net.Uri;
 import android.os.Bundle;
 import android.os.Environment;
 import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
+import android.view.View;
+import android.view.ViewGroup;
 import android.view.WindowManager;
+import android.widget.Button;
 import android.widget.ImageView;
+import android.widget.RelativeLayout;
 
 public class Sample4Mixed extends Activity implements CvCameraViewListener {
     private static final String    TAG = "OCVSample::Activity";
@@ -35,7 +48,7 @@ public class Sample4Mixed extends Activity implements CvCameraViewListener {
     private static final int       VIEW_MODE_GRAY     = 1;
     private static final int       VIEW_MODE_CANNY    = 2;
     private static final int       VIEW_MODE_FEATURES = 5;
-
+    private String SD_CARD_PATH;
 
     private int                    mViewMode;
     private Mat                    mRgba;
@@ -83,8 +96,7 @@ public class Sample4Mixed extends Activity implements CvCameraViewListener {
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
 
         setContentView(R.layout.tutorial4_surface_view);
-       
-
+        SD_CARD_PATH = Environment.getExternalStorageDirectory().toString();
         if (!OpenCVLoader.initDebug()) {
         	// Handle initialization error
         	Log.e("Here", "Here error");
@@ -101,7 +113,12 @@ public class Sample4Mixed extends Activity implements CvCameraViewListener {
         String SD_CARD_PATH = Environment.getExternalStorageDirectory().toString();
         File f1 = new File(SD_CARD_PATH + "/" + "test3.jpg");
         Mat test = Highgui.imread(f1.getAbsolutePath());
-        process(test);
+        try {
+			process(test);
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
         
     }
     
@@ -112,7 +129,12 @@ public class Sample4Mixed extends Activity implements CvCameraViewListener {
     			Mat test = new Mat();
     			Bitmap photo = (Bitmap) data.getExtras().get("data");
     			Utils.bitmapToMat(photo, test);
-    			process(test);
+    			try {
+					process(test);
+				} catch (IOException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
     		}
     	}
     }
@@ -227,33 +249,101 @@ public class Sample4Mixed extends Activity implements CvCameraViewListener {
         return true;
     }
     
-    public void process(Mat test) {
+    public void readFile(String name, List< List<Double> > pts, List< String > fnames) throws IOException {
+    	InputStream    fis;
+    	BufferedReader br;
+    	String         line;
+
+    	fis = new FileInputStream(name);
+    	br = new BufferedReader(new InputStreamReader(fis, Charset.forName("UTF-8")));
+    	while ((line = br.readLine()) != null) {
+    	    String[] parts = line.split(" ");
+    	    List<Double> temp = new ArrayList<Double>();
+    	    temp.add(Double.parseDouble(parts[0])); temp.add(Double.parseDouble(parts[1]));
+    	    pts.add(temp);
+    	    fnames.add(parts[2]);
+    	}
+    }
+    
+    public void process(Mat test) throws IOException {
     	Mat orig = imageRetrieve(test);
+    	Mat test2 = test.clone();
 		saveImg(test, "res.jpg");
 		Imgproc.cvtColor(orig, orig, Imgproc.COLOR_RGBA2GRAY);
         Imgproc.cvtColor(test, test, Imgproc.COLOR_RGBA2GRAY);
-        double[] arr = new double[1];
-        arr[0] = 10;
-        Mat p = new Mat(2, 2, CvType.CV_64FC1);	
-        p.put(0, 0, arr);
-        arr[0] = 100;
-        p.put(0, 1, arr);
-        arr[0] = 10;
-        p.put(0, 0, arr);
-        arr[0] = 1000;
-        p.put(0, 1, arr);
+        
+        
+        // the file name to read the points from
+        String uri = SD_CARD_PATH + "/" + "pts.txt";
+        
+        List< List<Double> > pts = new ArrayList< List<Double> >();
+        List<String> fnames  = new ArrayList<String>();
+        readFile(uri, pts, fnames);
+        Mat p = new Mat(fnames.size(), 2, CvType.CV_64FC1);
+        for(int i=0; i<fnames.size(); i++) {
+        	p.put(i,0,pts.get(i).get(0));
+        	p.put(i,1,pts.get(i).get(1));
+        }
+        
+        //get screen resolutions
+        double screenY = imageView.getHeight();
+        double screenX = imageView.getWidth();
+        
+        //get image resolutions
+        double imgY = test2.height();
+        double imgX = test2.width();
+        
+        // get the multiply ratio
+        double ratX = screenX/imgX;
+        double ratY = screenY/imgY;
+        Log.v("TAG", Double.toString(ratX) + " " + Double.toString(ratY));
         
         mapPoints(orig.getNativeObjAddr(), test.getNativeObjAddr(), p.getNativeObjAddr());
-        String res = Double.toString(p.get(0,0)[0]) + " " + Double.toString(p.get(0,1)[0]) + " ";
-        res += Double.toString(p.get(1,0)[0]) + " " + Double.toString(p.get(1,1)[0]);
-        Log.v("TAG", res);
-        Core.line(test, new Point(p.get(0,0)[0], p.get(0,1)[0]), new Point(p.get(1,0)[0], p.get(1,1)[0]), new Scalar(0,255,0), 10);
-        Bitmap bmp = Bitmap.createBitmap(test.cols(), test.rows(), Bitmap.Config.ARGB_8888);
-        Utils.matToBitmap(test, bmp);
+        
+        //Core.line(test, new Point(p.get(0,0)[0], p.get(0,1)[0]), new Point(p.get(1,0)[0], p.get(1,1)[0]), new Scalar(0,255,0), 10);
+        Bitmap bmp = Bitmap.createBitmap(test2.cols(), test2.rows(), Bitmap.Config.ARGB_8888);
+        Utils.matToBitmap(test2, bmp);
         imageView.setImageBitmap(bmp);
+        	
+        
+        RelativeLayout rl = (RelativeLayout) findViewById(R.id.RelativeLayout1);
+        //RelativeLayout.LayoutParams params = new RelativeLayout.LayoutParams(30, 40);
+        
+        
+        for(int i=0; i<fnames.size(); i++) {
+        	Button play = getVideoButton("play", (float)0.5, fnames.get(i));
+        	RelativeLayout.LayoutParams buttonParams = 
+            		new RelativeLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, 
+            										 ViewGroup.LayoutParams.WRAP_CONTENT);
+        	buttonParams.leftMargin = (int) (p.get(i,1)[0]);
+            buttonParams.topMargin = (int) (p.get(i,0)[0]);
+            String res = Double.toString(buttonParams.leftMargin) + " " + Double.toString(buttonParams.topMargin);
+            Log.v("TAG", res);
+            rl.addView(play, buttonParams);
+        }
         
     }
 
+    private Button getVideoButton(String name, float alpha, String vid_fname) {
+    	final String fname = vid_fname;
+    	Button play = new Button(getApplicationContext());
+        play.setText(name);
+        play.setAlpha((float) alpha);
+        play.setOnClickListener(new View.OnClickListener() {	
+			
+			@Override
+			public void onClick(View v) {
+				
+		    	String uri = SD_CARD_PATH + "/" + fname;
+		    	Uri u = Uri.parse(uri);
+		    	Log.v("TAG", uri);
+		    	Intent vid = new Intent(Intent.ACTION_VIEW);
+		    	vid.setDataAndType(u, "video/*");
+		    	startActivity(vid);
+			}
+		});
+        return play;
+    }
     
 	public native void FindFeatures(long matAddrGr, long matAddrRgba);
     public native void Draw(long matOrig, long matTest);
