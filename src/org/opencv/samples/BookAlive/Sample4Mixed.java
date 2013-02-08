@@ -19,17 +19,18 @@ import org.opencv.android.Utils;
 import org.opencv.core.Core;
 import org.opencv.core.CvType;
 import org.opencv.core.Mat;
-import org.opencv.core.Point;
-import org.opencv.core.Scalar;
+import org.opencv.core.Size;
 import org.opencv.highgui.Highgui;
 import org.opencv.imgproc.Imgproc;
 
 import android.app.Activity;
 import android.content.Intent;
 import android.graphics.Bitmap;
+import android.graphics.Matrix;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Environment;
+import android.provider.MediaStore;
 import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
@@ -39,6 +40,7 @@ import android.view.WindowManager;
 import android.widget.Button;
 import android.widget.ImageView;
 import android.widget.RelativeLayout;
+import android.widget.Toast;
 
 public class Sample4Mixed extends Activity implements CvCameraViewListener {
     private static final String    TAG = "OCVSample::Activity";
@@ -60,7 +62,7 @@ public class Sample4Mixed extends Activity implements CvCameraViewListener {
     private MenuItem               mItemPreviewCanny;
     private MenuItem               mItemPreviewFeatures;
     ImageView imageView;
-
+    Uri mImageUri;
     private CameraBridgeViewBase   mOpenCvCameraView;
 
     private BaseLoaderCallback  mLoaderCallback = new BaseLoaderCallback(this) {
@@ -105,13 +107,21 @@ public class Sample4Mixed extends Activity implements CvCameraViewListener {
         //mOpenCvCameraView = (CameraBridgeViewBase) findViewById(R.id.tutorial4_activity_surface_view);
         //mOpenCvCameraView.setCvCameraViewListener(this);
         
-
-        //Intent intent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
-        //startActivityForResult(intent, CAPTURE_IMAGE);
+        File photo = new File("/mnt/sdcard/BookAlive/temp.jpg");
+		
+        photo.delete();
+        mImageUri = Uri.fromFile(photo);
         
+        Intent intent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
+        intent.putExtra(MediaStore.EXTRA_OUTPUT,  mImageUri);
+        //intent.putExtra("outputFormat", Bitmap.CompressFormat.JPEG.toString());
+        //intent.putExtra("return-data", true);
+        startActivityForResult(Intent.createChooser(intent, "Select Picture"), CAPTURE_IMAGE);
+        
+        /*
         // TEMP FOR NOW
         String SD_CARD_PATH = Environment.getExternalStorageDirectory().toString();
-        File f1 = new File(SD_CARD_PATH + "/" + "test3.jpg");
+        File f1 = new File(SD_CARD_PATH + "/" + "BookAlive/test3.jpg");
         Mat test = Highgui.imread(f1.getAbsolutePath());
         try {
 			process(test);
@@ -119,17 +129,24 @@ public class Sample4Mixed extends Activity implements CvCameraViewListener {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
+		*/
         
     }
     
+      
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
     	if(requestCode == CAPTURE_IMAGE) {
     		if(resultCode == RESULT_OK) {
-    			Mat test = new Mat();
-    			Bitmap photo = (Bitmap) data.getExtras().get("data");
-    			Utils.bitmapToMat(photo, test);
+    			
+    			//Bitmap photo = (Bitmap) data.getExtras().get("data");
+    			//Utils.bitmapToMat(photo, test);
+    			Mat test = Highgui.imread("/mnt/sdcard/BookAlive/temp.jpg");
+    			Log.v("TAG", Double.toString(test.height()) +" "+ Double.toString(test.width()));
+    			Toast t = Toast.makeText(getApplicationContext(), Double.toString(test.height()) +" "+ Double.toString(test.width()), Toast.LENGTH_LONG);
+    			t.show();
     			try {
+					Core.flip(test.t(), test, 1);
 					process(test);
 				} catch (IOException e) {
 					// TODO Auto-generated catch block
@@ -141,7 +158,7 @@ public class Sample4Mixed extends Activity implements CvCameraViewListener {
     
     protected void saveImg(Mat img, String fname) {
     	String SD_CARD_PATH = Environment.getExternalStorageDirectory().toString();
-    	String uri = SD_CARD_PATH + "/" + fname;
+    	String uri = SD_CARD_PATH + "/BookAlive/" + fname;
     	Highgui.imwrite(uri, img);
     }
     
@@ -149,8 +166,12 @@ public class Sample4Mixed extends Activity implements CvCameraViewListener {
     protected Mat imageRetrieve(Mat test) {
     	// TODO
     	String SD_CARD_PATH = Environment.getExternalStorageDirectory().toString();
-        File f1 = new File(SD_CARD_PATH + "/" + "act.jpg");
+    	Log.v("TAG", SD_CARD_PATH + "/" + "BookAlive/act.jpg");
+        File f1 = new File(SD_CARD_PATH + "/" + "BookAlive/act.jpg");
         Mat orig = Highgui.imread(f1.getAbsolutePath());
+        if(f1.exists()){
+            Log.v("TAG", "Height: " + orig.height() + " Width: " + orig.width());
+        }
         return orig;
     }
     
@@ -274,7 +295,7 @@ public class Sample4Mixed extends Activity implements CvCameraViewListener {
         
         
         // the file name to read the points from
-        String uri = SD_CARD_PATH + "/" + "pts.txt";
+        String uri = SD_CARD_PATH + "/" + "BookAlive/pts.txt";
         
         List< List<Double> > pts = new ArrayList< List<Double> >();
         List<String> fnames  = new ArrayList<String>();
@@ -328,13 +349,13 @@ public class Sample4Mixed extends Activity implements CvCameraViewListener {
     	final String fname = vid_fname;
     	Button play = new Button(getApplicationContext());
         play.setText(name);
-        play.setAlpha((float) alpha);
+       // play.setAlpha((float) alpha);
         play.setOnClickListener(new View.OnClickListener() {	
 			
 			@Override
 			public void onClick(View v) {
 				
-		    	String uri = SD_CARD_PATH + "/" + fname;
+		    	String uri = SD_CARD_PATH + "/BookAlive/" + fname;
 		    	Uri u = Uri.parse(uri);
 		    	Log.v("TAG", uri);
 		    	Intent vid = new Intent(Intent.ACTION_VIEW);

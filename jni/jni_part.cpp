@@ -89,7 +89,8 @@ JNIEXPORT void JNICALL Java_org_opencv_samples_BookAlive_Sample4Mixed_mapPoints(
     Mat& orig  = *(Mat*)addrOrig;
     Mat& test = *(Mat*)addrTest;
     Mat& pts =  *(Mat*)addrPts;
-
+    
+    resize(test, test, orig.size());
 
 
     Mat H = findHomography(test,orig);
